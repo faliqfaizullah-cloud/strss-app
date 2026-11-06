@@ -1,0 +1,24 @@
+name: Build Strss APK
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: 8.9 }
+      - run: gradle :app:assembleDebug --no-daemon
+      - run: cp app/build/outputs/apk/debug/app-debug.apk Strss.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: Strss-apk, path: Strss.apk }
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with: { files: Strss.apk }
