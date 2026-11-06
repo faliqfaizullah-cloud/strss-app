@@ -8,6 +8,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -75,7 +77,9 @@ fun StrssApp() {
         snap = withContext(Dispatchers.IO) { Usage.snapshot(ctx) }
         StrssWidget.refresh(ctx)
     }
-    BackHandler(screen != "home" || sheet != null) { if (sheet != null) sheet = null else screen = "home" }
+    var iconSheet by remember { mutableStateOf(false) }
+    var boxIcon by remember { mutableStateOf(AppIcon.isBox(ctx)) }
+    BackHandler(screen != "home" || sheet != null || iconSheet) { if (iconSheet) iconSheet = false else if (sheet != null) sheet = null else screen = "home" }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val root = IntSize(constraints.maxWidth, constraints.maxHeight)
@@ -84,7 +88,7 @@ fun StrssApp() {
             val go: (String) -> Unit = { screen = it }
             val openSheet: (String, String) -> Unit = { p, l -> sheet = p to l }
             when (screen) {
-                "home" -> HomeScreen(snap, premium, { premium = it; store.premium = it }, go)
+                "home" -> HomeScreen(snap, premium, { premium = it; store.premium = it }, go) { iconSheet = true }
                 "stress" -> StressScreen(snap, go)
                 "time" -> TimeScreen(snap, limits, go, openSheet)
                 "timers" -> TimersScreen(snap, limits, go, openSheet)
@@ -100,6 +104,10 @@ fun StrssApp() {
                     store.setLimit(pkg, m); limits = store.limits(); LimitService.start(ctx); sheet = null
                 }, onDismiss = { sheet = null })
             }
+
+            if (iconSheet) IconSheet(boxIcon, { useBox ->
+                AppIcon.set(ctx, useBox); boxIcon = useBox; Haptics.double(ctx)
+            }, { iconSheet = false })
         }
     }
 }
@@ -160,10 +168,10 @@ private fun AccessCard(snap: Snap) {
 
 // =====================================================================================  HOME
 @Composable
-fun HomeScreen(snap: Snap, premium: Boolean, onPremium: (Boolean) -> Unit, go: (String) -> Unit) {
+fun HomeScreen(snap: Snap, premium: Boolean, onPremium: (Boolean) -> Unit, go: (String) -> Unit, onIcon: () -> Unit) {
     Page(null, go) {
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Ico("breathe", 40.dp)
+            Ico("breathe", 40.dp, modifier = Modifier.tap(onIcon))
             Spacer(Modifier.weight(1f))
             Glass(shape = CircleShape, tint = 0.10f) {
                 Row(Modifier.padding(4.dp)) {
@@ -587,5 +595,45 @@ fun InsightsScreen(snap: Snap, go: (String) -> Unit) {
                 )
             }
         }
+    }
+}
+
+
+// =====================================================================================  APP ICON PICKER
+@Composable
+fun IconSheet(box: Boolean, onPick: (Boolean) -> Unit, onDismiss: () -> Unit) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0x66101820))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        Glass(
+            Modifier.padding(24.dp).fillMaxWidth().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
+            RoundedCornerShape(28.dp), 0.28f, 26.dp
+        ) {
+            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Tx("App icon", 20, 600)
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    IconChoice("Default", R.drawable.ic_default_preview, !box) { onPick(false) }
+                    IconChoice("Shoe box", R.drawable.ic_box_preview, box) { onPick(true) }
+                }
+                Tx("Your launcher can take a few seconds to show the new icon.", 12, 400, W70, align = TextAlign.Center)
+                GlassButton("Done", filled = true, modifier = Modifier.fillMaxWidth()) { onDismiss() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IconChoice(label: String, res: Int, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.tap(onClick), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier.size(96.dp).clip(RoundedCornerShape(26.dp))
+                .border(if (selected) 3.dp else 1.dp, if (selected) Color.White else Color.White.copy(alpha = 0.3f), RoundedCornerShape(26.dp))
+                .padding(if (selected) 3.dp else 1.dp)
+        ) {
+            Image(painterResource(res), null, Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)))
+        }
+        Tx(label, 14, if (selected) 700 else 500)
     }
 }
